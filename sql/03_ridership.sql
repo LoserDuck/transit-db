@@ -3,9 +3,7 @@
 -- 전제: data/ridership_wide.csv (UTF-8, 52컬럼, 헤더 있음)
 -- 실행: 프로젝트 루트에서  psql transit -f sql/03_ridership.sql
 
--- ============================================================
 -- 1) 원본(wide)을 그대로 받는 staging 테이블 (52컬럼, 전부 text)
--- ============================================================
 DROP TABLE IF EXISTS stg_ridership;
 CREATE TABLE stg_ridership (
     ym text,
@@ -64,10 +62,8 @@ CREATE TABLE stg_ridership (
 
 \copy stg_ridership FROM 'data/ridership_wide.csv' WITH (FORMAT csv, HEADER true)
 
--- ============================================================
 -- 2) 정제된 long 테이블 (연도별 RANGE 파티셔닝)
 --    한 줄 = 한 역 · 한 달 · 한 시간대
--- ============================================================
 DROP TABLE IF EXISTS ridership CASCADE;
 CREATE TABLE ridership (
     station     varchar(50) NOT NULL,   -- 지하철역(역명)
@@ -107,9 +103,7 @@ CREATE TABLE IF NOT EXISTS ridership_2026 PARTITION OF ridership
 -- 범위 밖 데이터 방어용 기본 파티션
 CREATE TABLE IF NOT EXISTS ridership_default PARTITION OF ridership DEFAULT;
 
--- ============================================================
 -- 3) wide -> long 변환 (unpivot): 48개 시간대 컬럼을 24행으로 펼침
--- ============================================================
 INSERT INTO ridership (station, line, ride_month, hour_band, board_cnt, alight_cnt)
 SELECT s.station,
        s.line,
@@ -145,8 +139,6 @@ CROSS JOIN LATERAL (VALUES
     (3::smallint, s.h03_on,  s.h03_off)
 ) AS v(hour_band, board, alight);
 
--- ============================================================
 -- 4) 확인 (인덱스는 튜닝 단계에서 before/after 측정하며 추가 예정)
--- ============================================================
 SELECT count(*) AS ridership_rows FROM ridership;
 SELECT ride_month, count(*) FROM ridership GROUP BY ride_month ORDER BY ride_month LIMIT 5;
